@@ -9,6 +9,8 @@
 #########################################################
 
 # Initialize variables & default parameters
+base_dir=`pwd`/
+project_dir=$(cd "$(dirname "$0")";pwd)
 minspan=30
 spe1=""
 spe2=""
@@ -73,14 +75,14 @@ check_python_environment () {
 
 # find anchor gene pair using MCScan
 find_anchor_pairs () {
-    mkdir "$workspace"
-    cp "${spe1}.cds" "${spe1}.bed" "${spe2}.cds" "${spe2}.bed" "${workspace}/"
-    cd $workspace
+    mkdir "$base_dir/$workspace"
+    cp "$base_dir/${spe1}.cds" "$base_dir/${spe1}.bed" "$base_dir/${spe2}.cds" "$base_dir/${spe2}.bed" "$base_dir/${workspace}/"
+    cd $base_dir/$workspace
     python -m jcvi.compara.catalog ortholog $spe1 $spe2 --no_strip-names
     python -m jcvi.compara.synteny screen --minspan=$minspan --simple $spe1.$spe2.anchors $spe1.$spe2.anchors.$minspan
-    cp $spe1.$spe2.anchors.$minspan ../anchor-pair.result.dirt;cd ..
-    grep -v "#" anchors-pair.result.dirt > anchors-pair.result
+    grep -v "#" $spe1.$spe2.anchors.$minspan | cut -f1,2 > anchors-pair.result.tsv
 }
 
 get_parameters $*
+check_python_environment
 find_anchor_pairs
