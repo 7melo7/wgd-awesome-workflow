@@ -9,7 +9,7 @@
 #########################################################
 
 # Initialize variables & default parameters
-base_dir=`pwd`/
+base_dir=`pwd`
 project_dir=$(cd "$(dirname "$0")";pwd)
 minspan=30
 spe1=""
@@ -60,13 +60,9 @@ get_parameters () {
 
 # check python environment and package
 check_python_environment () {
-    py_version=`python --version | grep 'Python 2' | wc -l`
     jcvi_check=`pip list | grep 'jcvi' | wc -l`
-    if [[ $py_version -eq 1 && $jcvi_check -eq 1 ]];then
+    if [[ $jcvi_check -eq 1 ]];then
         echo "python environment right and required packages installed."
-    elif [[ $py_check -eq 0 ]];then
-        echo "Error: python environment should be Python2.7."
-        exit 1;
     elif [[ !$jcvi_check -eq 0 ]];then
         echo "Error: jcvi package not installed."
         exit 1;
@@ -76,13 +72,42 @@ check_python_environment () {
 # find anchor gene pair using MCScan
 find_anchor_pairs () {
     mkdir "$base_dir/$workspace"
-    cp "$base_dir/${spe1}.cds" "$base_dir/${spe1}.bed" "$base_dir/${spe2}.cds" "$base_dir/${spe2}.bed" "$base_dir/${workspace}/"
+    cp "$base_dir/${spe1}.cds" "$base_dir/${spe1}.bed" "$base_dir/${workspace}/"
+    cp "$base_dir/${spe2}.cds" "$base_dir/${spe2}.bed" "$base_dir/${workspace}/"
     cd $base_dir/$workspace
-    python -m jcvi.compara.catalog ortholog $spe1 $spe2 --no_strip-names
+    python -m jcvi.compara.catalog ortholog $spe1 $spe2
     python -m jcvi.compara.synteny screen --minspan=$minspan --simple $spe1.$spe2.anchors $spe1.$spe2.anchors.$minspan
     grep -v "#" $spe1.$spe2.anchors.$minspan | cut -f1,2 > anchors-pair.result.tsv
 }
 
+# i am at $base_dir/$workspace now.
+
+# get ortholog gene pair in fasta file
+ortholog_gene_pair_write() {
+    mkdir gene_pair_dirct
+    if [ ${spe1} == ${spe2} ];then
+        final_cds="${spe1}.cds"
+    else
+        cat $base_dir/$spe1.cds $base_dir/$spe2.cds > $base_dir/$workspace/merge.cds
+        final_cds="merge.cds"
+    fi
+    python $project_dir/py/extract_anchors.py $base_dir/$workspace/anchors-pair.result.tsv $base_dir/$final_cds $base_dir/$workspace/gene_pair_dirct
+}
+
+# ka ks calculate
+ka_ks_calculate () {
+    count=`ls -l $base_dir/$workspace/gene_pair_dirct/*fasta | wc -l`
+    for i in $(seq 1 $count);do
+        muscle -in $base_dir/$workspace/gene_pair_dirct/$i.fasta -phyiout $base_dir/$workspace/gene_pair_dirct/$i.phy
+        AXTConvertor $base_dir/$workspace/gene_pair_dirct/$i.phy $base_dir/$workspace/gene_pair_dirct/$i.axt
+    done
+    cat $base_dir/$workspace/gene_pair_dirct/*axt > $base_dir/$workspace/gene_pair_dirct/${spe1}_${spe2}.axt
+    KaKs_Calculator -i $base_dir/$workspace/gene_pair_dirct/${spe1}_${spe2}.axt -o $base_dir/${spe1}_${spe2}_kaks.csv -m YN -c 11
+}
+
 get_parameters $*
-check_python_environment
-find_anchor_pairs
+# check_python_environment
+# find_anchor_pairs
+# ortholog_gene_pair_write
+ka_ks_calculate
+echo all done!
